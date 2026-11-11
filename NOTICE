@@ -27,12 +27,21 @@ for a jailbroken PlayStation 5, an idea popularised by:
     Licensed GPL-3.0. No code was copied or adapted from this project. Credit
     for the concept and for proving it worth building belongs to its authors.
 
+The architecture, the module boundaries, the metadata rules and every line in
+this repository were written for this project. Where a behaviour was learned by
+observing another implementation, the behaviour was described first and then
+implemented here independently.
+
 ## Third-party components
 
 Components linked into or bundled with a release are listed here with their
 licences. This list is maintained by hand; see CONTRIBUTING.md.
 
+  * **None.** No third-party library is linked into a build. The project uses
+    the C++ standard library only: the JSON reader, the SHA-256 implementation,
+    the ZIP writer and the HTTP server are all part of this repository, which is
+    why there is nothing here to vendor, patch or audit on the console.
+
   * PS5 Payload SDK (John Törnblom and contributors) — see the SDK's own licence.
-    Required to build for hardware; not vendored into this repository.
-  * Rust crate dependencies — see `Cargo.lock` and each crate's own licence.
-    Every dependency must be GPL-3.0-compatible; this is enforced at review.
+    Required to build for hardware; not vendored into this repository. It
+    supplies the compiler wrapper and the `libkernel` import stubs.

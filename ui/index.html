@@ -1,117 +1,217 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ps5-pandora</title>
-    <style>
-      :root {
-        --bg: #0b0f14;
-        --panel: #10161f;
-        --line: #1d2836;
-        --text: #e6edf3;
-        --muted: #8b98a9;
-        --accent: #22d3ee;
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ps5-pandora</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0e1013;
+    --panel: #171a1f;
+    --line: #262b33;
+    --text: #e6e9ee;
+    --muted: #8b95a5;
+    --accent: #6ea8fe;
+    --ok: #4ec9a8;
+    --bad: #e06c75;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    padding: 22px 24px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 19px; letter-spacing: .01em; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  main { padding: 24px; max-width: 900px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+  .card dt { color: var(--muted); }
+  .card dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .row { display: flex; gap: 8px; margin: 18px 0 12px; }
+  input {
+    flex: 1;
+    background: #0b0d10;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  button {
+    background: var(--accent);
+    border: 0;
+    border-radius: 8px;
+    padding: 9px 16px;
+    color: #07121f;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .status-ok { color: var(--ok); }
+  .status-bad { color: var(--bad); }
+  .note { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ps5-pandora</h1>
+  <span class="tag">all-in-one manager for a jailbroken PS5</span>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card">
+      <h2>Server</h2>
+      <dl id="health">
+        <dt>status</dt><dd>checking…</dd>
+      </dl>
+    </section>
+    <section class="card">
+      <h2>Build</h2>
+      <dl id="build">
+        <dt>name</dt><dd>—</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="row">
+    <input id="path" value="/data" spellcheck="false" aria-label="Directory to list">
+    <button id="list">List</button>
+  </div>
+
+  <section class="card">
+    <h2 id="listing-title">Directory</h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>Size</th></tr>
+      </thead>
+      <tbody id="entries">
+        <tr><td colspan="3">Nothing listed yet.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p class="note">
+    This page is served by the local server and talks only to it. Nothing leaves the console.
+  </p>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function fill(elementId, pairs) {
+    const list = $(elementId);
+    list.innerHTML = "";
+    for (const [key, value] of pairs) {
+      const dt = document.createElement("dt");
+      dt.textContent = key;
+      const dd = document.createElement("dd");
+      dd.textContent = value;
+      list.append(dt, dd);
+    }
+  }
+
+  function humanSize(bytes) {
+    if (!bytes) return "—";
+    const units = ["B", "KB", "MB", "GB"];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+    return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+  }
+
+  async function loadHealth() {
+    try {
+      const response = await fetch("/api/health");
+      const data = await response.json();
+      fill("health", [
+        ["status", data.status],
+        ["platform", data.platform],
+        ["version", data.version],
+      ]);
+      $("health").firstElementChild.nextElementSibling.classList.add(
+        data.status === "ok" ? "status-ok" : "status-bad");
+    } catch (error) {
+      fill("health", [["error", String(error)]]);
+    }
+  }
+
+  async function loadVersion() {
+    try {
+      const response = await fetch("/api/version");
+      const data = await response.json();
+      fill("build", [
+        ["name", data.name],
+        ["version", data.version],
+        ["data root", data.data_root],
+      ]);
+    } catch (error) {
+      fill("build", [["error", String(error)]]);
+    }
+  }
+
+  async function loadListing() {
+    const path = $("path").value;
+    $("listing-title").textContent = path || "Directory";
+    const body = $("entries");
+    body.innerHTML = "";
+
+    try {
+      const response = await fetch(`/api/fs/list?path=${encodeURIComponent(path)}`);
+      const data = await response.json();
+
+      if (data.error) {
+        body.innerHTML = `<tr><td colspan="3" class="status-bad">${data.error}</td></tr>`;
+        return;
       }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background: radial-gradient(1200px 600px at 50% -10%, #10222b 0%, var(--bg) 60%);
-        color: var(--text);
-        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-        display: grid;
-        place-items: center;
-        padding: 24px;
+      if (!data.entries.length) {
+        body.innerHTML = `<tr><td colspan="3">Empty.</td></tr>`;
+        return;
       }
-      main { width: min(680px, 100%); }
-      h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
-      .sub { color: var(--muted); margin: 0 0 24px; }
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 18px 20px;
+      for (const entry of data.entries) {
+        const row = document.createElement("tr");
+        const name = document.createElement("td");
+        name.textContent = entry.is_dir ? `${entry.name}/` : entry.name;
+        name.className = "mono";
+        const type = document.createElement("td");
+        type.textContent = entry.is_dir ? "dir" : "file";
+        const size = document.createElement("td");
+        size.textContent = entry.is_dir ? "—" : humanSize(entry.size);
+        row.append(name, type, size);
+        body.append(row);
       }
-      .row {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 8px 0;
-        border-bottom: 1px solid var(--line);
-      }
-      .row:last-child { border-bottom: 0; }
-      .k { color: var(--muted); }
-      .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .ok { color: var(--accent); }
-      .bad { color: #f87171; }
-      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 10px; }
-      ul { margin: 0; padding-left: 18px; }
-      li { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-      footer { color: var(--muted); font-size: 12px; margin-top: 28px; }
-      a { color: var(--accent); }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>ps5-pandora</h1>
-      <p class="sub">Placeholder dashboard. The real interface is not built yet.</p>
+    } catch (error) {
+      body.innerHTML = `<tr><td colspan="3" class="status-bad">${error}</td></tr>`;
+    }
+  }
 
-      <div class="card">
-        <div class="row"><span class="k">status</span><span class="v" id="status">…</span></div>
-        <div class="row"><span class="k">version</span><span class="v" id="version">…</span></div>
-        <div class="row"><span class="k">platform</span><span class="v" id="platform">…</span></div>
-        <div class="row"><span class="k">data root</span><span class="v" id="root">…</span></div>
-      </div>
+  $("list").addEventListener("click", loadListing);
+  $("path").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") loadListing();
+  });
 
-      <h2>data root listing</h2>
-      <div class="card"><ul id="listing"><li>…</li></ul></div>
-
-      <footer>
-        Pre-alpha. Nothing here is safe to rely on yet. See
-        <code>docs/ROADMAP.md</code> and <code>CONTRIBUTING.md</code>.
-      </footer>
-    </main>
-
-    <script>
-      const set = (id, text, cls) => {
-        const el = document.getElementById(id);
-        el.textContent = text;
-        if (cls) el.className = "v " + cls;
-      };
-
-      async function load() {
-        try {
-          const health = await fetch("/api/health").then((r) => r.json());
-          set("status", health.status === "ok" ? "ok" : String(health.status), health.status === "ok" ? "ok" : "bad");
-          set("version", String(health.version));
-          set("platform", String(health.platform));
-
-          const info = await fetch("/api/version").then((r) => r.json());
-          set("root", String(info.data_root));
-        } catch (err) {
-          set("status", "unreachable", "bad");
-        }
-
-        try {
-          const entries = await fetch("/api/fs/list").then((r) => r.json());
-          const list = document.getElementById("listing");
-          list.innerHTML = "";
-          if (!Array.isArray(entries) || entries.length === 0) {
-            list.innerHTML = "<li>(empty or unavailable)</li>";
-            return;
-          }
-          for (const entry of entries.slice(0, 50)) {
-            const li = document.createElement("li");
-            li.textContent = (entry.is_dir ? "[dir]  " : "[file] ") + entry.name;
-            list.appendChild(li);
-          }
-        } catch (err) {
-          /* the listing is best-effort on the placeholder page */
-        }
-      }
-
-      load();
-    </script>
-  </body>
+  loadHealth();
+  loadVersion();
+</script>
+</body>
 </html>

@@ -10,59 +10,69 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
+  CTEST_OUTPUT_ON_FAILURE: 1
 
 jobs:
-  fmt:
-    name: fmt
+  format:
+    name: clang-format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all --check
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Every source file must be formatted
+        run: |
+          files=$(git ls-files '*.cpp' '*.hpp')
+          if [ -z "$files" ]; then
+            echo "::error::no C++ sources found; check the checkout"
+            exit 1
+          fi
+          clang-format --dry-run --Werror $files
 
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-
-  test:
-    name: test (${{ matrix.os }})
+  build-and-test:
+    name: ${{ matrix.compiler }} / ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - { os: ubuntu-latest, compiler: gcc, cc: gcc-14, cxx: g++-14 }
+          - { os: ubuntu-latest, compiler: clang, cc: clang, cxx: clang++ }
+          - { os: macos-latest, compiler: clang, cc: clang, cxx: clang++ }
     runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --all-targets
+      - name: Show the compiler
+        run: ${{ matrix.cxx }} --version
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build (warnings are errors)
+        run: cmake --build build -j 3
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
-  msrv:
-    name: minimum supported Rust version
+  sanitizers:
+    name: address + undefined behaviour
     runs-on: ubuntu-latest
+    env:
+      CC: gcc-14
+      CXX: g++-14
     steps:
       - uses: actions/checkout@v4
-      - name: Read rust-version from Cargo.toml
-        id: msrv
-        shell: bash
+      - name: Configure with ASan and UBSan
         run: |
-          version=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ steps.msrv.outputs.version }}
-      - run: cargo build --workspace
+          cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build
+        run: cmake --build build-asan -j 3
+      - name: Test under the sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build-asan --output-on-failure
 
   signoff:
     name: DCO sign-off
@@ -90,25 +100,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Validate metadata
-        run: cargo run -p pandora-cli -- param validate pkg/sce_sys/param.json
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j 3
+      - name: Validate the metadata
+        run: ./build/pandora-cli param validate pkg/sce_sys/param.json
       - name: Build the archive
-        run: cargo run -p pandora-cli -- package --source pkg --out dist
-      - name: The title folder must be at the top of the archive
+        run: ./build/pandora-cli package pkg dist/PPSA77010.zip
+      - name: The title folder must be at the top, checked by an independent zip reader
         run: |
           python3 - <<'PY'
-          import json, sys, zipfile
+          import json, zipfile
+
           param = json.load(open("pkg/sce_sys/param.json"))
           title_id = param["titleId"]
           path = f"dist/{title_id}.zip"
-          with zipfile.ZipFile(path) as z:
-              names = z.namelist()
+
+          with zipfile.ZipFile(path) as archive:
+              bad = archive.testzip()
+              assert bad is None, f"CRC check failed on {bad}"
+              names = archive.namelist()
+
           assert f"{title_id}/" in names, f"missing {title_id}/ at the top: {names}"
           assert any(n.startswith(f"{title_id}/sce_sys/") for n in names), names
-          print(f"ok: {path} has {len(names)} entries")
+          print(f"ok: {path} has {len(names)} entries, CRCs verified")
           PY
+      - name: The hash the catalog needs
+        run: ./build/pandora-cli digest dist/PPSA77010.zip
       - uses: actions/upload-artifact@v4
         with:
           name: title-zip

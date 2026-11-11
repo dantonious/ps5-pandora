@@ -1,0 +1,27 @@
+# Canonical formatting for this repository.
+#
+#     clang-format -i $(git ls-files '*.cpp' '*.hpp')
+#
+# CI runs `clang-format --dry-run --Werror` over the same file set, so a pull
+# request that is not formatted cannot merge. Formatting is not a matter of
+# taste here: it removes a whole category of review comments.
+---
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++20
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+DerivePointerAlignment: false
+PointerAlignment: Left
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
+SpaceAfterTemplateKeyword: false

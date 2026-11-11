@@ -1,0 +1,21 @@
+{
+  "app.title": "ps5-pandora",
+  "app.subtitle": "all-in-one manager for a jailbroken PS5",
+  "server.heading": "Server",
+  "server.status": "status",
+  "server.platform": "platform",
+  "server.version": "version",
+  "build.heading": "Build",
+  "build.name": "name",
+  "build.data_root": "data root",
+  "listing.heading": "Directory",
+  "listing.column.name": "Name",
+  "listing.column.type": "Type",
+  "listing.column.size": "Size",
+  "listing.type.dir": "dir",
+  "listing.type.file": "file",
+  "listing.empty": "Empty.",
+  "listing.nothing": "Nothing listed yet.",
+  "listing.list": "List",
+  "note.local_only": "This page is served by the local server and talks only to it. Nothing leaves the console."
+}

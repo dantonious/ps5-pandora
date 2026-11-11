@@ -3,42 +3,51 @@
 Ordered by risk, not by appeal. The things most likely to kill the project come
 first.
 
-## M0 — Prove Rust can run on the console
+## M0 — Prove the console build runs
 
-**The question:** can a `no_std` Rust binary load and execute as a PS5 payload?
+**The question:** can a binary produced from this repository load and execute on
+a real PS5?
 
-This is the gate. Everything else is wasted effort if the answer is no.
+This is the gate. Everything else is wasted effort if the answer is no. The
+toolchain file and `src/platform_console.cpp` exist; nothing has been run.
 
-- Custom target spec for the console ABI.
-- Build a payload that prints one line to stdout and exits.
-- Load it on hardware; record the result in a hardware issue.
+- Build with `cmake/ps5-toolchain.cmake` and load the payload.
+- Capture the output, or the absence of it, in a hardware issue.
+- Confirm which libkernel symbols the `extern "C"` block needs, and whether the
+  names are right.
 
-**Done when:** a Rust binary runs on a real console and its output is captured.
+**Done when:** a hardware report shows the program running on a console, with its
+output captured. A report that says "it crashes" is a valid and useful result.
 
 ## M1 — Reach the kernel, not just the CPU
 
 Prove the FFI layer works for the operations the product needs.
 
-- `sceKernelOpen/Close/Read/Write/Getdents` through `platform::ps5`.
+- `sceKernelOpen/Close/Read/Write/Getdents` through `platform_console.cpp`.
 - List a directory and read a file on hardware.
-- Confirm the directory framing assumption in `ps5.rs` against real output.
+- Check the directory-entry framing assumption (records padded to four bytes)
+  against real output. It is an assumption, not a measurement.
 
 **Done when:** a hardware report shows a correct directory listing.
 
-## M2 — Serve a dashboard from the console
+## M2 — Serve the dashboard from the console
 
-- TCP listener on the console.
-- `axum` (or a hand-rolled HTTP layer if allocation constraints demand it) on
-  the target.
-- `/api/health` reachable from a browser on the LAN.
+- Bind a TCP listener on the console.
+- Reach `/api/health` from the console's own browser.
+- Confirm `std::filesystem` works on the console target, or replace it in
+  `platform_console.cpp` with direct libkernel calls. **This is the main open
+  assumption in the current code**: the console implementation uses
+  `std::filesystem` for path handling and directory creation, and the console's
+  libc++ may not provide it.
 
 **Done when:** a browser on the LAN loads the page served by the payload.
 
 ## M3 — Be installable as a native title
 
-- Produce the title folder (`eboot.bin`, `sce_sys/param.json`, `sce_sys/icon0.png`).
+- Produce the title folder (`eboot.bin`, `sce_sys/param.json`,
+  `sce_sys/icon0.png`).
 - Reserve a title ID and replace the `PPSA77010` placeholder.
-- `pandora package` output installs and launches from the home screen.
+- `pandora-cli package` output installs and launches from the home screen.
 
 **Done when:** the app launches as its own title, not as a payload sent by hand.
 
@@ -46,7 +55,9 @@ Prove the FFI layer works for the operations the product needs.
 
 - Browse, upload, download, rename, copy, move, delete.
 - Long operations as background jobs with progress.
-- Path containment: nothing escapes the configured root.
+- Path containment: nothing escapes the configured root. The current
+  `/api/fs/list` takes whatever path it is given, which is fine on loopback and
+  not fine on a LAN.
 
 ## M5 — Payload management
 

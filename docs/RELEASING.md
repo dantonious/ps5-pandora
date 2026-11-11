@@ -10,35 +10,40 @@ failure mode we have seen.
    console ever offers it as an update.
 
    ```sh
-   cargo run -p pandora-cli -- param bump pkg/sce_sys/param.json
+   ./build/pandora-cli param bump pkg/sce_sys/param.json
+   ./build/pandora-cli param show pkg/sce_sys/param.json
    ```
+
+   `--minor` and `--major` are also accepted. A bump clamps at the field width.
 
 2. **Validate the metadata.**
 
    ```sh
-   cargo run -p pandora-cli -- param validate pkg/sce_sys/param.json
+   ./build/pandora-cli param validate pkg/sce_sys/param.json
    ```
 
 3. **Run the gates.**
 
    ```sh
-   make fmt && make lint && make test
+   make fmt-check && make test
    ```
 
 4. **Update `CHANGELOG.md`.** Move entries out of `Unreleased` into a version
    heading. The changelog is what users read; commit messages are not.
 
 5. **Test on hardware, or say you did not.** A release note that claims hardware
-   support without a test report is a lie users will discover.
+   support without a test report is a lie users will discover. Today the honest
+   answer is that nothing has run on hardware yet.
 
 ## Build the artifact
 
 ```sh
-cargo run -p pandora-cli -- package --source pkg --out dist
-cargo run -p pandora-cli -- digest dist/PPSA77010.zip
+make package
+./build/pandora-cli digest dist/PPSA77010.zip
 ```
 
 The tag must equal the version, and the asset must be named `<TITLEID>.zip`.
+Record the SHA-256: it is what a catalog record pins.
 
 ## Publish
 

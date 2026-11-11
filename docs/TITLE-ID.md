@@ -16,10 +16,14 @@ four uppercase letters followed by five digits.
   the prefix).
 - Case matters. Lowercase is not accepted.
 
-`pandora` enforces all of this:
+The tool enforces all of this, and rejects each range with a reason you can read:
 
 ```sh
-cargo run -p pandora-cli -- title-id check PPSA77010
+./build/pandora-cli title-id check PPSA77010
+# PPSA77010: valid
+
+./build/pandora-cli title-id check CUSA12345
+# CUSA12345: invalid — CUSA belongs to PS4 titles
 ```
 
 ## Choosing one

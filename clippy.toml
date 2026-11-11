@@ -1,2 +1,0 @@
-# Deny the most common foot-guns early; see CONTRIBUTING.md -> Coding standards.
-avoid-breaking-exported-api = false

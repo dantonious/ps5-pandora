@@ -2,7 +2,7 @@
 
 Thanks for being here. This project exists because people show up and improve
 it, and there is useful work for every skill level — you do not have to write
-Rust to make a real contribution.
+C++ to make a real contribution.
 
 This document is the contract between you and the project. It is deliberately
 specific: follow it and your contribution moves quickly; skip it and a
@@ -37,9 +37,9 @@ neglected:
 | **Bug reports** | Open an issue with the bug template | Everyone |
 | **Hardware testing** | Run a build on your console and report the result | Anyone with a jailbroken PS5 |
 | **Documentation** | Fix or extend anything under `docs/` or in a README | Everyone |
-| **Translations** | Add or improve a locale under `ui/src/i18n/` | Fluent speakers |
+| **Translations** | Add or improve a locale under `ui/` | Fluent speakers |
 | **Design / UX** | Propose UI flows, icons, accessibility fixes | Designers |
-| **Code** | Pick up an issue, especially `good first issue` | Rust developers |
+| **Code** | Pick up an issue, especially `good first issue` | C++ developers |
 | **Triage** | Reproduce reports, ask for missing detail, link duplicates | Regulars |
 | **Code review** | Review open pull requests | Anyone who knows the area |
 
@@ -51,8 +51,8 @@ asking for a pointer. That is a welcome question, not a nuisance.
 **Small fixes** (typo, broken link, obvious bug) — open a pull request
 directly. No issue needed.
 
-**Anything substantial** — a new subsystem, a new dependency, a change to the
-public API, a refactor across crates — **open an issue first** and wait for a
+**Anything substantial** — a new subsystem, a new dependency, a change to a
+public header, a refactor across modules — **open an issue first** and wait for a
 maintainer to agree on the approach. This is not gatekeeping: it is how we
 avoid you spending a weekend on a design that will be rejected. [GOVERNANCE.md](GOVERNANCE.md)
 explains how decisions are made.
@@ -62,29 +62,33 @@ contribution that goes silent after review will be closed after 30 days.
 
 ## Development environment
 
-### 1. Rust
+### 1. A C++20 toolchain
 
-Install a stable toolchain with [rustup](https://rustup.rs/):
+You need a C++20 compiler and CMake 3.20 or newer. Tested with GCC 14.2.
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup component add rustfmt clippy
+# Debian / Ubuntu
+sudo apt install build-essential cmake clang-format
+
+# macOS
+brew install cmake llvm clang-format
 ```
 
-The workspace pins the toolchain in `rust-toolchain.toml`; `rustup` will honour
-it automatically. Minimum supported Rust version is declared in `Cargo.toml`
-(`rust-version`) and enforced in CI.
+`clang-format` is worth installing: CI checks formatting, and `make fmt` fixes
+it locally. `.clang-format` is committed and is the single source of truth.
 
 ### 2. Build for the host (no console required)
 
-This is the normal loop for most work. The whole workspace builds and tests
+This is the normal loop for most work. The whole project builds and tests
 without the PS5 Payload SDK:
 
 ```sh
 git clone https://github.com/dantonious/ps5-pandora
 cd ps5-pandora
-cargo test --workspace
-cargo run -p pandora-http
+cmake -S . -B build
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+./build/pandora-http
 ```
 
 Most logic — validation, parsing, routing, configuration, the platform *contract*
@@ -93,7 +97,7 @@ host, it must be.
 
 ### 3. Build for hardware (optional, needs a console)
 
-Only needed if you are working on the `ps5` platform layer or want to run a
+Only needed if you are working on the console platform layer or want to run a
 build. Install the PS5 Payload SDK:
 
 ```sh
@@ -106,35 +110,38 @@ Then:
 
 ```sh
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-make build-hw
+make console
+cmake --build build-console -j
 ```
 
 Full details, including common failures, are in [docs/BUILDING.md](docs/BUILDING.md).
 
 ### 4. Editor
 
-Any editor works. `.editorconfig`, `rustfmt.toml` and `clippy.toml` are
-committed, so formatting matches whatever you use. For VS Code,
-`rust-analyzer` plus `cargo clippy` on save is what most of us run.
+Any editor works. `.editorconfig` and `.clang-format` are committed, so
+formatting matches whatever you use. CMake exports
+`build/compile_commands.json`, which is what an editor's C++ language server
+reads — point it there and do not hand-write a second set of include paths.
 
 ## Build, test and lint
 
-Everything runs through `make`, but the plain `cargo` equivalents are listed so
-you can use whichever you prefer.
+Everything runs through `make`, but the plain CMake equivalents are listed so you
+can use whichever you prefer.
 
-| Task | `make` | `cargo` |
+| Task | `make` | plain |
 | --- | --- | --- |
-| Format | `make fmt` | `cargo fmt --all` |
-| Lint | `make lint` | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Test | `make test` | `cargo test --workspace` |
-| Build | `make build` | `cargo build --workspace` |
-| Docs | `make doc` | `cargo doc --workspace --no-deps --open` |
-| Package title | `make package` | `cargo run -p pandora-cli -- package` |
+| Configure | `make configure` | `cmake -S . -B build` |
+| Format | `make fmt` | `clang-format -i $(git ls-files '*.cpp' '*.hpp')` |
+| Lint | `make lint` | `cmake --build build -j` (warnings are errors) |
+| Build | `make build` | `cmake --build build -j` |
+| Test | `make test` | `ctest --test-dir build --output-on-failure` |
+| Serve | `make run` | `./build/pandora-http` |
+| Package title | `make package` | `./build/pandora-cli package pkg dist/PPSA77010.zip` |
 
 **Before you push, run the same three gates CI runs:**
 
 ```sh
-make fmt && make lint && make test
+make fmt-check && make build && make test
 ```
 
 A pull request that fails these will not be reviewed until they pass.
@@ -142,55 +149,70 @@ A pull request that fails these will not be reviewed until they pass.
 ## Project layout
 
 ```
-crates/pandora-core/   Domain types and the platform abstraction.
-  src/version.rs         ContentVersion: parse, order, format.
-  src/param.rs           sce_sys/param.json + title ID rules.
-  src/config.rs          Runtime configuration.
-  src/platform/mod.rs    The Platform trait.
-  src/platform/host.rs   Development implementation (std::fs).
-  src/platform/ps5.rs    Console implementation. cfg-gated; UNVALIDATED.
-crates/pandora-http/   Axum router, API handlers, embedded UI.
-crates/pandora-cli/    Host-side tooling.
-ui/                    Frontend sources.
+include/pandora/       Public headers. One per module; this is the contract.
+  version.hpp            ContentVersion: parse, order, format.
+  param.hpp              sce_sys/param.json + title ID rules.
+  json.hpp               The small JSON reader this project needs, and no more.
+  config.hpp             Runtime configuration.
+  log.hpp                The log levels and the one logging entry point.
+  sha256.hpp             SHA-256.
+  zip.hpp                The release-archive writer.
+  http.hpp               Request, Response, routing, the server.
+  platform.hpp           The Platform interface.
+src/
+  version.cpp param.cpp json.cpp config.cpp log.cpp sha256.cpp zip.cpp
+  http.cpp               Routing and the accept loop.
+  main_http.cpp          The pandora-http entry point.
+  platform_host.cpp      Development implementation (std::filesystem).
+  platform_console.cpp   Console implementation. Compiled only for hardware. UNVALIDATED.
+tools/pandora-cli/     Host-side tooling.
+tests/                 One suite per module, plus the packaging end-to-end test.
+ui/                    Frontend source, compiled into the binary.
 pkg/sce_sys/           Native title metadata (param.json, icon0.png).
+cmake/                 Toolchain file and the packaging test.
 docs/                  Architecture, building, title IDs, releasing, roadmap.
 ```
 
 The rule that keeps this maintainable: **`pandora-core` never depends on
-`pandora-http` or `pandora-cli`, and console-specific code never leaks outside
-`platform::ps5`.**
+`pandora-http-core`, `pandora-http` or `pandora-cli`, and console-specific code
+never leaks outside `src/platform_console.cpp`.**
 
 ## Coding standards
 
 These are enforced at review, and most of them are enforced by CI.
 
-1. **`cargo fmt` is not negotiable.** CI runs `--check`.
-2. **`clippy -D warnings` is not negotiable.** If a lint is genuinely wrong,
-   justify an `#[allow(...)]` on the smallest possible scope, with a comment
-   saying why.
-3. **Every `unsafe` block needs a `// SAFETY:` comment** explaining why the
-   block is sound: pointer validity, lifetime, aliasing, alignment. An
-   unexplained `unsafe` block is rejected on sight. Keep `unsafe` inside
-   `platform::ps5`; if you need it elsewhere, discuss it in an issue first.
-4. **No `unwrap()` / `expect()` / `panic!()` on a path a user can reach.** In
-   tests and in provably-total cases (e.g. a literal parses), it is fine. Use
-   `Result` and the `PandoraError` type.
-5. **No new dependency without discussion.** Rust dependencies are cheap to add
-   and expensive to remove, and every one must be GPL-3.0-compatible. Open an
-   issue with the rationale, alternatives considered, and why the stdlib or an
-   existing dependency will not do.
-6. **`pandora-core` must stay `no_std`-friendly.** Do not pull in `tokio`,
-   `std::net` or anything else that assumes a hosted runtime. `std` may be
-   used only where it is behind a feature or in the host platform module.
-7. **Public items get doc comments.** `///` on every public type, function and
-   module, saying what it does and what it assumes. No exceptions for
-   "obvious" items — the next reader is not you.
-8. **Tests live next to the code** in `#[cfg(test)] mod tests`, plus integration
-   tests under `tests/`. A behaviour change without a test is an incomplete
-   change.
-9. **Errors are typed, not stringly.** Return `PandoraError` variants; do not
-   format an error message and return it as a `String`.
+1. **`clang-format` is not negotiable.** CI runs `--dry-run --Werror`. `make fmt`
+   fixes it; do not reflow code by hand to match a style you prefer.
+2. **The build is `-Werror`, with `-Wconversion` and `-Wsign-conversion` on.**
+   If a warning is genuinely wrong, justify a scoped `#pragma` with a comment
+   saying why. Do not silence a conversion warning with a cast you have not
+   checked — that is how a wrong number reaches the console.
+3. **Every FFI declaration needs a comment** naming the symbol's origin and the
+   contract you are relying on, and these belong in `src/platform_console.cpp`
+   only. If you need one elsewhere, discuss it in an issue first.
+4. **No exceptions on a path a user can reach.** A throwing payload on a console
+   is a reboot. Use the `std::error_code` overloads of `<filesystem>`, not the
+   throwing ones. `throw` is acceptable only in `main`-level argument parsing
+   where the alternative is not starting at all.
+5. **No new dependency without discussion.** This project links nothing but the
+   standard library, and that is a feature. Open an issue with the rationale,
+   the alternatives considered, and what it costs to cross-compile for the
+   console — then expect to be asked to write it here instead.
+6. **`pandora-core` must stay free of platform assumptions.** No sockets, no
+   threads, no `<filesystem>` outside the platform implementations, nothing that
+   assumes a hosted runtime. The console's libc++ is not the host's.
+7. **Public declarations get doc comments.** A `///`-style comment on every type,
+   function and constant in `include/pandora/`, saying what it does and what it
+   assumes. No exceptions for "obvious" items — the next reader is not you.
+8. **Tests live in `tests/`**, one suite per module, plus the end-to-end
+   packaging test. A behaviour change without a test is an incomplete change. A
+   bug fix starts with a test that fails.
+9. **Errors are values with context.** Every fallible function takes a
+   `std::string* error` and writes a sentence a user can act on. Do not return a
+   bool with no way to find out what went wrong.
 10. **Do not comment out code.** Delete it; git remembers.
+11. **No new public API without a use.** A header is a contract; do not add a
+    function "for later".
 
 ## Commits and sign-off
 
@@ -205,13 +227,14 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`,
-`chore`. Scope is the area: `core`, `http`, `cli`, `ui`, `pkg`, `docs`.
+`chore`. Scope is the area: `core`, `http`, `cli`, `ui`, `pkg`, `docs`,
+`platform`.
 
 Examples:
 
 ```
 feat(core): validate contentVersion against the NN.NNN.NNN rule
-fix(http): return 404 instead of panicking on an unknown path
+fix(http): return 404 instead of an empty 200 for an unknown path
 docs(contributing): explain how to report hardware test results
 ```
 
@@ -287,12 +310,13 @@ the project the licence described in [Licence of your contribution](#licence-of-
 
 | Job | What it does | Must pass to merge |
 | --- | --- | --- |
-| `fmt` | `cargo fmt --all --check` | Yes |
-| `clippy` | `cargo clippy --workspace --all-targets -- -D warnings` | Yes |
-| `test` | `cargo test --workspace` on Linux, macOS and Windows | Yes |
-| `msrv` | Builds with the declared minimum Rust version | Yes |
+| `format` | `clang-format --dry-run --Werror` over every source | Yes |
+| `build` | Configure + build on Linux and macOS, warnings as errors | Yes |
+| `test` | `ctest` on Linux and macOS | Yes |
+| `gcc` / `clang` | Builds with both compilers | Yes |
+| `sanitizers` | Builds and tests with ASan and UBSan | Yes |
 | `signoff` | Every commit has a `Signed-off-by` trailer | Yes |
-| `package` | Runs `pandora package` and checks the archive layout | Yes |
+| `package` | Runs `pandora-cli package` and checks the archive layout with an independent zip reader | Yes |
 
 Console builds are **not** in CI: they need the SDK and a licensed toolchain.
 That is exactly why step 4 above matters.
@@ -302,9 +326,9 @@ That is exactly why step 4 above matters.
 Open an issue with the **Bug report** template. A useful report contains:
 
 - What you did, what you expected, what happened.
-- The exact build: `pandora --version`, and whether it ran on the host or on a
-  console (model + firmware version).
-- Logs. Raise the log level first: `RUST_LOG=debug`.
+- The exact build: `./build/pandora-cli version`, and whether it ran on the host
+  or on a console (model + firmware version).
+- Logs. Raise the log level first: `./build/pandora-http --log debug`.
 - A minimal reproduction, if you can find one.
 
 Please do **not** paste copyrighted console dumps, keys, or personal data. If a
@@ -322,8 +346,10 @@ existing issue is more useful than opening a duplicate.
 
 ## Translations
 
-The UI is translated through locale files under `ui/src/i18n/`. To add a
-language:
+UI strings are collected under `ui/locales/`, one flat `key: value` file per
+language. The page still renders English inline and the lookup is not wired yet,
+so a translation today is the input for that work rather than a change users see
+immediately. To add a language:
 
 1. Copy `en.json` to `<locale>.json` and translate the values. Do not translate
    the keys.
@@ -361,6 +387,7 @@ To keep the project legally clean and welcome to contributors:
   can be assessed.
 - **Reimplementations of proprietary Sony code or leaked SDK material.** Use
   the public PS5 Payload SDK only.
+- **Code that cannot be built with `-Werror`.** The build is the first review.
 - **Piracy features.** Anything whose purpose is obtaining or installing
   content the user does not own. PKG installation of the user's own packages is
   in scope; circumventing entitlement is not.

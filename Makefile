@@ -1,47 +1,64 @@
 # ps5-pandora — developer entry points.
 # Run `make` with no target to see the list.
 
-CARGO ?= cargo
-PARAM ?= pkg/sce_sys/param.json
-DIST  ?= dist
+BUILD   ?= build
+DIST    ?= dist
+PARAM   ?= pkg/sce_sys/param.json
+TITLE_ID?= PPSA77010
+JOBS    ?= $(shell nproc 2>/dev/null || echo 4)
 
-.PHONY: help fmt fmt-check lint test build doc package doctor ci clean build-hw
+CMAKE         ?= cmake
+CLANG_FORMAT  ?= clang-format
+
+FORMAT_FILES = $(wildcard include/pandora/*.hpp) \
+               $(wildcard src/*.cpp) \
+               $(wildcard tests/*.cpp) \
+               $(wildcard tests/support/*.hpp) \
+               $(wildcard tools/pandora-cli/*.cpp)
+
+.PHONY: help configure fmt fmt-check lint build test run package doctor ci clean distclean console clean-console
 
 help: ## Show this help
-	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
 
-fmt: ## Format the workspace
-	$(CARGO) fmt --all
+configure: ## Configure the host build
+	$(CMAKE) -S . -B $(BUILD)
 
-fmt-check: ## Check formatting without changing files
-	$(CARGO) fmt --all --check
+fmt: ## Format every C++ source in place
+	$(CLANG_FORMAT) -i $(FORMAT_FILES)
 
-lint: ## Run clippy, warnings are errors
-	$(CARGO) clippy --workspace --all-targets -- -D warnings
+fmt-check: ## Fail if anything is not formatted (what CI runs)
+	$(CLANG_FORMAT) --dry-run --Werror $(FORMAT_FILES)
 
-test: ## Run the test suite
-	$(CARGO) test --workspace
+lint: ## Build with every warning turned into an error
+	$(CMAKE) --build $(BUILD) -j$(JOBS)
 
-build: ## Build every crate for the host
-	$(CARGO) build --workspace
+build: configure ## Build every target
+	$(CMAKE) --build $(BUILD) -j$(JOBS)
 
-doc: ## Build and open the API docs
-	$(CARGO) doc --workspace --no-deps --open
+test: build ## Run the test suite
+	ctest --test-dir $(BUILD) --output-on-failure
 
-package: ## Build dist/<TITLEID>.zip from pkg/
-	$(CARGO) run -p pandora-cli -- package --source pkg --out $(DIST)
+run: build ## Serve the dashboard on http://127.0.0.1:8080
+	./$(BUILD)/pandora-http
 
-doctor: ## Check the build environment
-	$(CARGO) run -p pandora-cli -- doctor
+package: build ## Build dist/<TITLEID>.zip from pkg/
+	./$(BUILD)/pandora-cli package pkg $(DIST)/$(TITLE_ID).zip
 
-ci: fmt-check lint test ## What CI runs
+doctor: build ## Check the build environment
+	./$(BUILD)/pandora-cli doctor
+
+ci: fmt-check build test ## What CI runs
 	@echo "all local gates passed"
 
-build-hw: ## Build for the console (not implemented yet)
-	@echo "Hardware builds are not wired up yet."
-	@echo "The console target is milestone M0 in docs/ROADMAP.md."
-	@exit 1
+console: ## Configure the console build (needs PS5_PAYLOAD_SDK; UNVALIDATED)
+	$(CMAKE) -S . -B $(BUILD)-console \
+	  -DCMAKE_TOOLCHAIN_FILE=cmake/ps5-toolchain.cmake \
+	  -DPANDORA_BUILD_CONSOLE=ON \
+	  -DPANDORA_BUILD_TESTS=OFF
 
-clean: ## Remove build output
-	$(CARGO) clean
-	rm -rf $(DIST)
+clean: ## Remove the build directory and dist/
+	rm -rf $(BUILD) $(DIST)
+
+clean-console: ## Remove the console build directory
+	rm -rf $(BUILD)-console

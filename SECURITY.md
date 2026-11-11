@@ -28,7 +28,8 @@ move faster.
 This software runs with high privilege on a console, so the bar is low and the
 consequences are high. In scope:
 
-- Memory-safety bugs in safe Rust code, or unsound `unsafe` in
+- Memory-safety bugs that reachable input can trigger, or an unsound FFI
+  declaration in
   `platform::ps5` — including a `// SAFETY:` comment that is simply wrong.
 - Path traversal or arbitrary file write through the HTTP API, especially
   anything that escapes the configured data root.

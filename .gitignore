@@ -1,16 +1,30 @@
-/target
-/dist
-/data
+# CMake
+/build/
+/build-*/
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+
+# Build output
+/dist/
+/data/
 *.log
+*.zip
+
+# Objects and binaries
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.pkg
 
 # PS5 Payload SDK
 /opt/ps5-payload-sdk
 /ps5-payload-sdk
-
-# Frontend
-node_modules/
-ui/dist/
-.ui-build/
 
 # Editors / OS
 .idea/

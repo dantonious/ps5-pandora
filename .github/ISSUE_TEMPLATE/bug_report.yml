@@ -15,8 +15,8 @@ body:
       label: What happened?
       description: What you did, what you expected, what actually happened.
       placeholder: |
-        1. Ran `cargo run -p pandora-http`
-        2. Opened http://127.0.0.1:7070
+        1. Ran `./build/pandora-http`
+        2. Opened http://127.0.0.1:8080
         3. Expected the listing, got an empty page
     validations:
       required: true
@@ -33,7 +33,7 @@ body:
     id: version
     attributes:
       label: Version or commit
-      description: Output of `pandora --version`, or the commit hash.
+      description: Output of `./build/pandora-cli version`, or the commit hash.
     validations:
       required: true
 
@@ -42,7 +42,7 @@ body:
     attributes:
       label: Where did this happen?
       options:
-        - Host (cargo run / cargo test)
+        - Host (cmake build / ctest)
         - Console, as a payload
         - Console, installed as a title
         - CI
@@ -53,7 +53,7 @@ body:
   - type: input
     id: firmware
     attributes:
-      label: Console firmware version (if applicable)
+      label: Console firmware version and model (if applicable)
       placeholder: e.g. 09.00
     validations:
       required: false
@@ -62,7 +62,7 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Run with `RUST_LOG=debug`. Redact serial numbers, account IDs and anything personal.
+      description: Run with `--log debug`. Redact serial numbers, account IDs and anything personal.
       render: shell
     validations:
       required: false
@@ -75,4 +75,6 @@ body:
         - label: I searched existing issues and this is not a duplicate.
           required: true
         - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true
+        - label: I am running a jailbroken console I own.
           required: true
