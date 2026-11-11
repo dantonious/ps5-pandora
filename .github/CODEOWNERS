@@ -1,0 +1,6 @@
+# Default owner for everything in the repo.
+* @dantonious
+
+# The console FFI layer is the highest-risk code in the project and needs two
+# approvals (see GOVERNANCE.md).
+/crates/pandora-core/src/platform/ps5.rs @dantonious

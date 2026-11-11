@@ -1,0 +1,19 @@
+/target
+/dist
+/data
+*.log
+
+# PS5 Payload SDK
+/opt/ps5-payload-sdk
+/ps5-payload-sdk
+
+# Frontend
+node_modules/
+ui/dist/
+.ui-build/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

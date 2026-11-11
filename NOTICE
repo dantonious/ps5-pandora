@@ -1,0 +1,38 @@
+ps5-pandora
+Copyright (C) 2026 The ps5-pandora contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+## Provenance
+
+ps5-pandora is an **independent, from-scratch implementation**. It shares no
+source code with any other project.
+
+The project was *inspired by* the idea of a browser-served all-in-one manager
+for a jailbroken PlayStation 5, an idea popularised by:
+
+  * Prospero Manager (ProsperoMgr) — <https://github.com/notmaj0r/ProsperoMgr>
+    Licensed GPL-3.0. No code was copied or adapted from this project. Credit
+    for the concept and for proving it worth building belongs to its authors.
+
+## Third-party components
+
+Components linked into or bundled with a release are listed here with their
+licences. This list is maintained by hand; see CONTRIBUTING.md.
+
+  * PS5 Payload SDK (John Törnblom and contributors) — see the SDK's own licence.
+    Required to build for hardware; not vendored into this repository.
+  * Rust crate dependencies — see `Cargo.lock` and each crate's own licence.
+    Every dependency must be GPL-3.0-compatible; this is enforced at review.

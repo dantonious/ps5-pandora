@@ -1,0 +1,65 @@
+name: Hardware test report
+description: Report the result of running a build on a real console. Negative results are valuable too.
+labels: ["hardware", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hardware reports are among the most valuable contributions to this
+        project. A clear failure is worth as much as a success.
+
+  - type: input
+    id: build
+    attributes:
+      label: Build tested
+      description: Commit hash, tag, or release.
+      placeholder: v0.1.0 / 3f9a1c2
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Console firmware version
+      placeholder: e.g. 09.00
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Console model
+      placeholder: e.g. CFI-1216A
+    validations:
+      required: true
+
+  - type: input
+    id: loader
+    attributes:
+      label: Payload loader used
+      description: Which tool, and on which port.
+      placeholder: elfldr on 9020 / etaHEN built-in loader
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Loaded and worked as expected
+        - Loaded with errors
+        - Crashed on load
+        - Console needed a reboot
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details and logs
+      description: What you observed. Redact serial numbers and account IDs.
+      render: shell
+    validations:
+      required: true

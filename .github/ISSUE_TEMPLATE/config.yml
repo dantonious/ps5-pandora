@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/dantonious/ps5-pandora/discussions
+    about: Ask about using, building or contributing to the project.
+  - name: Security vulnerability
+    url: https://github.com/dantonious/ps5-pandora/security/advisories/new
+    about: Report privately. Never open a public issue for a vulnerability.

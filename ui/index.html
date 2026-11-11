@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ps5-pandora</title>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --panel: #10161f;
+        --line: #1d2836;
+        --text: #e6edf3;
+        --muted: #8b98a9;
+        --accent: #22d3ee;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 50% -10%, #10222b 0%, var(--bg) 60%);
+        color: var(--text);
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      main { width: min(680px, 100%); }
+      h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+      .sub { color: var(--muted); margin: 0 0 24px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px 20px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .row:last-child { border-bottom: 0; }
+      .k { color: var(--muted); }
+      .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .ok { color: var(--accent); }
+      .bad { color: #f87171; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 10px; }
+      ul { margin: 0; padding-left: 18px; }
+      li { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+      footer { color: var(--muted); font-size: 12px; margin-top: 28px; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ps5-pandora</h1>
+      <p class="sub">Placeholder dashboard. The real interface is not built yet.</p>
+
+      <div class="card">
+        <div class="row"><span class="k">status</span><span class="v" id="status">…</span></div>
+        <div class="row"><span class="k">version</span><span class="v" id="version">…</span></div>
+        <div class="row"><span class="k">platform</span><span class="v" id="platform">…</span></div>
+        <div class="row"><span class="k">data root</span><span class="v" id="root">…</span></div>
+      </div>
+
+      <h2>data root listing</h2>
+      <div class="card"><ul id="listing"><li>…</li></ul></div>
+
+      <footer>
+        Pre-alpha. Nothing here is safe to rely on yet. See
+        <code>docs/ROADMAP.md</code> and <code>CONTRIBUTING.md</code>.
+      </footer>
+    </main>
+
+    <script>
+      const set = (id, text, cls) => {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        if (cls) el.className = "v " + cls;
+      };
+
+      async function load() {
+        try {
+          const health = await fetch("/api/health").then((r) => r.json());
+          set("status", health.status === "ok" ? "ok" : String(health.status), health.status === "ok" ? "ok" : "bad");
+          set("version", String(health.version));
+          set("platform", String(health.platform));
+
+          const info = await fetch("/api/version").then((r) => r.json());
+          set("root", String(info.data_root));
+        } catch (err) {
+          set("status", "unreachable", "bad");
+        }
+
+        try {
+          const entries = await fetch("/api/fs/list").then((r) => r.json());
+          const list = document.getElementById("listing");
+          list.innerHTML = "";
+          if (!Array.isArray(entries) || entries.length === 0) {
+            list.innerHTML = "<li>(empty or unavailable)</li>";
+            return;
+          }
+          for (const entry of entries.slice(0, 50)) {
+            const li = document.createElement("li");
+            li.textContent = (entry.is_dir ? "[dir]  " : "[file] ") + entry.name;
+            list.appendChild(li);
+          }
+        } catch (err) {
+          /* the listing is best-effort on the placeholder page */
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>

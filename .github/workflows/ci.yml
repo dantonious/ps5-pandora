@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-targets
+
+  msrv:
+    name: minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read rust-version from Cargo.toml
+        id: msrv
+        shell: bash
+        run: |
+          version=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - run: cargo build --workspace
+
+  signoff:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Every commit must be signed off
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          missing=0
+          while read -r sha; do
+            if ! git log -1 --format=%B "$sha" | grep -qi '^Signed-off-by: .* <.*@.*>'; then
+              echo "::error::commit $sha has no Signed-off-by trailer (use: git commit -s)"
+              missing=1
+            fi
+          done < <(git rev-list "$base..$head")
+          exit $missing
+
+  package:
+    name: package title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate metadata
+        run: cargo run -p pandora-cli -- param validate pkg/sce_sys/param.json
+      - name: Build the archive
+        run: cargo run -p pandora-cli -- package --source pkg --out dist
+      - name: The title folder must be at the top of the archive
+        run: |
+          python3 - <<'PY'
+          import json, sys, zipfile
+          param = json.load(open("pkg/sce_sys/param.json"))
+          title_id = param["titleId"]
+          path = f"dist/{title_id}.zip"
+          with zipfile.ZipFile(path) as z:
+              names = z.namelist()
+          assert f"{title_id}/" in names, f"missing {title_id}/ at the top: {names}"
+          assert any(n.startswith(f"{title_id}/sce_sys/") for n in names), names
+          print(f"ok: {path} has {len(names)} entries")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: title-zip
+          path: dist/*.zip
+          if-no-files-found: error
